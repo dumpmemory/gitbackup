@@ -3,11 +3,34 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
 
 const defaultConfigFile = "gitbackup.yml"
+
+// defaultConfigPath returns the OS-specific default path for the config file.
+// On Linux: ~/.config/gitbackup/gitbackup.yml
+// On macOS: ~/Library/Application Support/gitbackup/gitbackup.yml
+// On Windows: %AppData%/gitbackup/gitbackup.yml
+func defaultConfigPath() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("unable to determine config directory: %v", err)
+	}
+	return filepath.Join(configDir, "gitbackup", defaultConfigFile), nil
+}
+
+// resolveConfigPath returns the config path to use.
+// If configPath is non-empty, it is returned as-is.
+// Otherwise, the OS-specific default path is returned.
+func resolveConfigPath(configPath string) (string, error) {
+	if configPath != "" {
+		return configPath, nil
+	}
+	return defaultConfigPath()
+}
 
 // fileConfig represents the YAML configuration file structure.
 // Migration-related flags are intentionally excluded as they
@@ -63,10 +86,22 @@ func defaultFileConfig() fileConfig {
 	}
 }
 
-// handleInitConfig creates a default gitbackup.yml in the current directory
-func handleInitConfig() error {
-	if _, err := os.Stat(defaultConfigFile); err == nil {
-		return fmt.Errorf("%s already exists", defaultConfigFile)
+// handleInitConfig creates a default gitbackup.yml at the given path,
+// or at the OS-specific default location if configPath is empty.
+func handleInitConfig(configPath string) error {
+	path, err := resolveConfigPath(configPath)
+	if err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("%s already exists", path)
+	}
+
+	// Create parent directory if it doesn't exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("error creating directory %s: %v", dir, err)
 	}
 
 	cfg := defaultFileConfig()
@@ -75,12 +110,12 @@ func handleInitConfig() error {
 		return fmt.Errorf("error generating config: %v", err)
 	}
 
-	err = os.WriteFile(defaultConfigFile, data, 0644)
+	err = os.WriteFile(path, data, 0644)
 	if err != nil {
-		return fmt.Errorf("error writing %s: %v", defaultConfigFile, err)
+		return fmt.Errorf("error writing %s: %v", path, err)
 	}
 
-	fmt.Printf("Created %s\n", defaultConfigFile)
+	fmt.Printf("Created %s\n", path)
 	return nil
 }
 
@@ -104,24 +139,36 @@ func fileConfigToAppConfig(fc *fileConfig) *appConfig {
 	}
 }
 
-// loadConfigFile reads and parses gitbackup.yml from the current directory
-func loadConfigFile() (*fileConfig, error) {
-	data, err := os.ReadFile(defaultConfigFile)
+// loadConfigFile reads and parses the config file at the given path,
+// or at the OS-specific default location if configPath is empty.
+func loadConfigFile(configPath string) (*fileConfig, error) {
+	path, err := resolveConfigPath(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %v", defaultConfigFile, err)
+		return nil, err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %v", path, err)
 	}
 
 	var cfg fileConfig
 	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing %s: %v", defaultConfigFile, err)
+		return nil, fmt.Errorf("error parsing %s: %v", path, err)
 	}
 	return &cfg, nil
 }
 
-// handleValidateConfig reads gitbackup.yml and validates its contents
-func handleValidateConfig() error {
-	cfg, err := loadConfigFile()
+// handleValidateConfig reads the config file and validates its contents.
+// If configPath is empty, the OS-specific default location is used.
+func handleValidateConfig(configPath string) error {
+	path, err := resolveConfigPath(configPath)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := loadConfigFile(configPath)
 	if err != nil {
 		return err
 	}
@@ -183,6 +230,6 @@ func handleValidateConfig() error {
 		return fmt.Errorf("config validation failed")
 	}
 
-	fmt.Printf("%s is valid\n", defaultConfigFile)
+	fmt.Printf("%s is valid\n", path)
 	return nil
 }

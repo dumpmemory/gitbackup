@@ -8,26 +8,18 @@ import (
 )
 
 // initConfig initializes and parses command-line flags into an appConfig struct.
-// If a gitbackup.yml exists in the current directory, it is loaded first and
-// CLI flags override any values from the config file.
+// If a config file exists at the default or specified location, it is loaded
+// first and CLI flags override any values from the config file.
 func initConfig(args []string) (*appConfig, error) {
 
-	// Try to load config file as the base configuration
-	var c appConfig
-	configFileLoaded := false
-	if _, err := os.Stat(defaultConfigFile); err == nil {
-		fc, err := loadConfigFile()
-		if err != nil {
-			return nil, err
-		}
-		c = *fileConfigToAppConfig(fc)
-		configFileLoaded = true
-	}
-
 	var githubNamespaceWhitelistString string
+	var configPath string
 	var flagConfig appConfig
 
 	fs := flag.NewFlagSet("gitbackup", flag.ExitOnError)
+
+	// Config file flag
+	fs.StringVar(&configPath, "config", "", "Path to config file (default: OS config directory)")
 
 	// Generic flags
 	fs.StringVar(&flagConfig.service, "service", "", "Git Hosted Service Name (github/gitlab/bitbucket/forgejo)")
@@ -86,6 +78,22 @@ func initConfig(args []string) (*appConfig, error) {
 	err := fs.Parse(args)
 	if err != nil && !errors.Is(err, flag.ErrHelp) {
 		return nil, err
+	}
+
+	// Try to load config file as the base configuration
+	var c appConfig
+	configFileLoaded := false
+
+	resolvedPath, pathErr := resolveConfigPath(configPath)
+	if pathErr == nil {
+		if _, err := os.Stat(resolvedPath); err == nil {
+			fc, err := loadConfigFile(configPath)
+			if err != nil {
+				return nil, err
+			}
+			c = *fileConfigToAppConfig(fc)
+			configFileLoaded = true
+		}
 	}
 
 	if configFileLoaded {

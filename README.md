@@ -120,10 +120,22 @@ are cloned via `https` basic auth and the token provided will be stored  in the 
 
 Instead of passing all options as CLI flags, you can use a ``gitbackup.yml`` configuration file.
 
-To create a default configuration file in the current directory:
+The config file is stored in the OS-specific configuration directory:
+
+- **Linux:** ``$XDG_CONFIG_HOME/gitbackup/gitbackup.yml`` or ``~/.config/gitbackup/gitbackup.yml``
+- **macOS:** ``~/Library/Application Support/gitbackup/gitbackup.yml``
+- **Windows:** ``%AppData%/gitbackup/gitbackup.yml``
+
+To create a default configuration file:
 
 ```lang=bash
 $ gitbackup init
+```
+
+To create it at a custom location:
+
+```lang=bash
+$ gitbackup init --config /path/to/gitbackup.yml
 ```
 
 This creates a ``gitbackup.yml`` with default values that you can edit:
@@ -152,10 +164,23 @@ To validate your configuration file (checks field values and required environmen
 $ gitbackup validate
 ```
 
-When ``gitbackup.yml`` exists in the current directory, it is automatically loaded at runtime. CLI flags override config file values, so you can use the config file for your base settings and override individual options as needed:
+To see available options for a subcommand:
+
+```lang=bash
+$ gitbackup init --help
+$ gitbackup validate --help
+```
+
+The config file is automatically loaded at runtime from the default location. CLI flags override config file values, so you can use the config file for your base settings and override individual options as needed:
 
 ```lang=bash
 $ GITHUB_TOKEN=secret$token gitbackup -ignore-fork
+```
+
+To use a config file at a custom location:
+
+```lang=bash
+$ GITHUB_TOKEN=secret$token gitbackup -config /path/to/gitbackup.yml
 ```
 
 Secrets (tokens, passwords) are not stored in the config file — they are always provided via environment variables.

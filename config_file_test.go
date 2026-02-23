@@ -9,19 +9,15 @@ import (
 )
 
 func TestHandleInitConfig(t *testing.T) {
-	// Work in a temp directory
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	configPath := filepath.Join(tmpDir, defaultConfigFile)
 
 	// First call should create the file
-	err := handleInitConfig()
+	err := handleInitConfig(configPath)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	configPath := filepath.Join(tmpDir, defaultConfigFile)
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		t.Fatal("Expected gitbackup.yml to be created")
 	}
@@ -50,26 +46,38 @@ func TestHandleInitConfig(t *testing.T) {
 	}
 
 	// Second call should error because file already exists
-	err = handleInitConfig()
+	err = handleInitConfig(configPath)
 	if err == nil {
 		t.Fatal("Expected error when config file already exists")
 	}
 }
 
+func TestHandleInitConfigCreatesParentDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "subdir", "nested", defaultConfigFile)
+
+	err := handleInitConfig(configPath)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Fatal("Expected config file to be created in nested directory")
+	}
+}
+
 func TestHandleValidateConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	configPath := filepath.Join(tmpDir, defaultConfigFile)
 
 	// Validate should fail if no config file exists
-	err := handleValidateConfig()
+	err := handleValidateConfig(configPath)
 	if err == nil {
 		t.Fatal("Expected error when config file doesn't exist")
 	}
 
 	// Create a valid config and set the required env var
-	err = handleInitConfig()
+	err = handleInitConfig(configPath)
 	if err != nil {
 		t.Fatalf("Expected no error creating config, got: %v", err)
 	}
@@ -77,7 +85,7 @@ func TestHandleValidateConfig(t *testing.T) {
 	os.Setenv("GITHUB_TOKEN", "testtoken")
 	defer os.Unsetenv("GITHUB_TOKEN")
 
-	err = handleValidateConfig()
+	err = handleValidateConfig(configPath)
 	if err != nil {
 		t.Fatalf("Expected valid config, got: %v", err)
 	}
@@ -85,14 +93,12 @@ func TestHandleValidateConfig(t *testing.T) {
 
 func TestHandleValidateConfigInvalidService(t *testing.T) {
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	configPath := filepath.Join(tmpDir, defaultConfigFile)
 
 	// Write a config with an invalid service
-	os.WriteFile(defaultConfigFile, []byte("service: notaservice\n"), 0644)
+	os.WriteFile(configPath, []byte("service: notaservice\n"), 0644)
 
-	err := handleValidateConfig()
+	err := handleValidateConfig(configPath)
 	if err == nil {
 		t.Fatal("Expected validation error for invalid service")
 	}
@@ -100,15 +106,13 @@ func TestHandleValidateConfigInvalidService(t *testing.T) {
 
 func TestHandleValidateConfigMissingEnvVar(t *testing.T) {
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	configPath := filepath.Join(tmpDir, defaultConfigFile)
 
 	// Write a valid gitlab config but don't set GITLAB_TOKEN
-	os.WriteFile(defaultConfigFile, []byte("service: gitlab\ngitlab:\n  project_visibility: internal\n  project_membership_type: all\n"), 0644)
+	os.WriteFile(configPath, []byte("service: gitlab\ngitlab:\n  project_visibility: internal\n  project_membership_type: all\n"), 0644)
 	os.Unsetenv("GITLAB_TOKEN")
 
-	err := handleValidateConfig()
+	err := handleValidateConfig(configPath)
 	if err == nil {
 		t.Fatal("Expected validation error for missing GITLAB_TOKEN")
 	}
@@ -116,17 +120,15 @@ func TestHandleValidateConfigMissingEnvVar(t *testing.T) {
 
 func TestInitConfigWithConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	configPath := filepath.Join(tmpDir, defaultConfigFile)
 
 	// Write a config file with specific values
-	os.WriteFile(defaultConfigFile, []byte("service: gitlab\nignore_fork: true\nuse_https_clone: true\ngitlab:\n  project_visibility: private\n  project_membership_type: owner\n"), 0644)
+	os.WriteFile(configPath, []byte("service: gitlab\nignore_fork: true\nuse_https_clone: true\ngitlab:\n  project_visibility: private\n  project_membership_type: owner\n"), 0644)
 	os.Setenv("GITLAB_TOKEN", "testtoken")
 	defer os.Unsetenv("GITLAB_TOKEN")
 
-	// initConfig with no CLI flags should use config file values
-	c, err := initConfig([]string{})
+	// initConfig with --config flag should use config file values
+	c, err := initConfig([]string{"-config", configPath})
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -150,17 +152,15 @@ func TestInitConfigWithConfigFile(t *testing.T) {
 
 func TestInitConfigCLIOverridesConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	configPath := filepath.Join(tmpDir, defaultConfigFile)
 
 	// Config file says gitlab with ignore_fork true
-	os.WriteFile(defaultConfigFile, []byte("service: gitlab\nignore_fork: true\ngitlab:\n  project_visibility: private\n  project_membership_type: all\n"), 0644)
+	os.WriteFile(configPath, []byte("service: gitlab\nignore_fork: true\ngitlab:\n  project_visibility: private\n  project_membership_type: all\n"), 0644)
 	os.Setenv("GITLAB_TOKEN", "testtoken")
 	defer os.Unsetenv("GITLAB_TOKEN")
 
 	// CLI flag overrides service to github
-	c, err := initConfig([]string{"-service", "github"})
+	c, err := initConfig([]string{"-config", configPath, "-service", "github"})
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -176,11 +176,6 @@ func TestInitConfigCLIOverridesConfigFile(t *testing.T) {
 }
 
 func TestInitConfigNoConfigFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
-
 	// No config file — should behave exactly as before
 	c, err := initConfig([]string{"-service", "github"})
 	if err != nil {
@@ -201,15 +196,13 @@ func TestInitConfigNoConfigFile(t *testing.T) {
 
 func TestHandleValidateConfigInvalidRepoType(t *testing.T) {
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	configPath := filepath.Join(tmpDir, defaultConfigFile)
 
-	os.WriteFile(defaultConfigFile, []byte("service: github\ngithub:\n  repo_type: badvalue\n"), 0644)
+	os.WriteFile(configPath, []byte("service: github\ngithub:\n  repo_type: badvalue\n"), 0644)
 	os.Setenv("GITHUB_TOKEN", "testtoken")
 	defer os.Unsetenv("GITHUB_TOKEN")
 
-	err := handleValidateConfig()
+	err := handleValidateConfig(configPath)
 	if err == nil {
 		t.Fatal("Expected validation error for invalid repo_type")
 	}
