@@ -42,3 +42,6 @@ gitbackup
 dist/
 
 testdata/**expected
+
+# Integration test secrets
+test/.env
