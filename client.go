@@ -206,6 +206,7 @@ func newForgejoClient(gitHostURLParsed *url.URL) *forgejo.Client {
 	}
 
 	gitHostToken = forgejoToken
+
 	log.Println("Creating forgejo client", url)
 	client, err := forgejo.NewClient(url, forgejo.SetToken(forgejoToken), forgejo.SetForgejoVersion(""))
 	if err != nil {
