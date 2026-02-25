@@ -90,9 +90,6 @@ func newClient(service string, gitHostURL string) interface{} {
 }
 
 // parseGitHostURL parses the git host URL if provided
-// TODO: there is a chance, this parsing breaks more than
-// one git service
-// https://github.com/amitsaha/gitbackup/issues/195
 func parseGitHostURL(gitHostURL string, service string) *url.URL {
 	if len(gitHostURL) == 0 {
 		return nil
@@ -103,12 +100,12 @@ func parseGitHostURL(gitHostURL string, service string) *url.URL {
 		log.Fatalf("Invalid git host URL: %s", gitHostURL)
 	}
 
-	// temp fix for https://github.com/amitsaha/gitbackup/issues/193
-	if service == "forgejo" {
-		return gitHostURLParsed
+	// Only GitLab requires /api/v4/ to be appended
+	if service == "gitlab" {
+		api, _ := url.Parse("api/v4/")
+		return gitHostURLParsed.ResolveReference(api)
 	}
-	api, _ := url.Parse("api/v4/")
-	return gitHostURLParsed.ResolveReference(api)
+	return gitHostURLParsed
 }
 
 // newGitHubClient creates a new GitHub client
@@ -179,14 +176,17 @@ func newBitbucketClient(gitHostURLParsed *url.URL) *bitbucket.Client {
 		log.Fatal("BITBUCKET_USERNAME environment variable not set")
 	}
 
-	bitbucketPassword := os.Getenv("BITBUCKET_PASSWORD")
-	if bitbucketPassword == "" {
-		log.Fatal("BITBUCKET_PASSWORD environment variable not set")
+	bitbucketPasswordOrToken := os.Getenv("BITBUCKET_TOKEN")
+	if bitbucketPasswordOrToken == "" {
+		bitbucketPasswordOrToken = os.Getenv("BITBUCKET_PASSWORD")
+	}
+	if bitbucketPasswordOrToken == "" {
+		log.Fatal("BITBUCKET_TOKEN or BITBUCKET_PASSWORD environment variable not set")
 	}
 
-	gitHostToken = bitbucketPassword
+	gitHostToken = bitbucketPasswordOrToken
+	client := bitbucket.NewBasicAuth(bitbucketUsername, bitbucketPasswordOrToken)
 
-	client := bitbucket.NewBasicAuth(bitbucketUsername, bitbucketPassword)
 	if gitHostURLParsed != nil {
 		client.SetApiBaseURL(*gitHostURLParsed)
 	}
@@ -204,6 +204,8 @@ func newForgejoClient(gitHostURLParsed *url.URL) *forgejo.Client {
 	if gitHostURLParsed != nil {
 		url = gitHostURLParsed.String()
 	}
+
+	gitHostToken = forgejoToken
 
 	log.Println("Creating forgejo client", url)
 	client, err := forgejo.NewClient(url, forgejo.SetToken(forgejoToken), forgejo.SetForgejoVersion(""))

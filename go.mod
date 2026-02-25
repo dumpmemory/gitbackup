@@ -4,14 +4,14 @@ go 1.25
 
 require (
 	github.com/99designs/keyring v1.2.2
-	github.com/cli/oauth v1.2.0
+	github.com/cli/oauth v1.2.2
 	github.com/google/go-github/v34 v34.0.0
 	github.com/ktrysmt/go-bitbucket v0.9.86
 	github.com/migueleliasweb/go-github-mock v0.0.22
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/spf13/afero v1.14.0
 	github.com/xanzy/go-gitlab v0.115.0
-	golang.org/x/oauth2 v0.30.0
+	golang.org/x/oauth2 v0.35.0
 	golang.org/x/text v0.27.0 // indirect
 )
 
