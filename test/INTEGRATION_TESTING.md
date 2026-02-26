@@ -19,6 +19,7 @@ Each contributor creates their own test accounts. The script expects a standard 
    - `gitbackup-test-public` (public)
    - `gitbackup-test-private` (private)
 3. Fork any public repo and rename it to `gitbackup-test-ignore-fork` (for testing `-ignore-fork`)
+4. Star the `gitbackup-test-public` repository
 
 ### GitLab
 
@@ -27,6 +28,7 @@ Each contributor creates their own test accounts. The script expects a standard 
    - `gitbackup-test-public` (public)
    - `gitbackup-test-private` (private)
 3. Fork any public project and rename it to `gitbackup-test-ignore-fork` (for testing `-ignore-fork`)
+4. Star the `gitbackup-test-public` project
 
 ### Bitbucket
 
@@ -43,6 +45,7 @@ Each contributor creates their own test accounts. The script expects a standard 
    - `gitbackup-test-public` (public)
    - `gitbackup-test-private` (private)
 3. Fork any public repo and rename it to `gitbackup-test-ignore-fork` (for testing `-ignore-fork`)
+4. Star the `gitbackup-test-public` repository
 
 ## Environment Setup
 
