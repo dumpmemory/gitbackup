@@ -5,6 +5,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BINARY="$REPO_ROOT/gitbackup"
 
+if [[ -t 1 ]]; then
+    GREEN='\033[0;32m'
+    RED='\033[0;31m'
+    BOLD='\033[1m'
+    RESET='\033[0m'
+else
+    GREEN='' RED='' BOLD='' RESET=''
+fi
+
 # Load env vars
 if [[ -f "$SCRIPT_DIR/.env" ]]; then
     set -a
@@ -29,17 +38,25 @@ fi
 # Expected repo names (same across all services)
 EXPECTED_REPOS="gitbackup-test-public gitbackup-test-private"
 
+log() {
+    local ts
+    ts=$(date +%H:%M:%S)
+    echo -e "[$ts] $*"
+}
+
+START_TIME=$SECONDS
+
 # --- Helpers ---
 
 pass() {
-    echo "  PASS: $1"
-    RESULTS+=("PASS: $1")
+    log "  ${GREEN}PASS${RESET}: $1"
+    RESULTS+=("${GREEN}PASS${RESET}: $1")
     PASSED=$((PASSED + 1))
 }
 
 fail() {
-    echo "  FAIL: $1"
-    RESULTS+=("FAIL: $1")
+    log "  ${RED}FAIL${RESET}: $1"
+    RESULTS+=("${RED}FAIL${RESET}: $1")
     FAILED=$((FAILED + 1))
 }
 
@@ -48,7 +65,7 @@ check_env() {
     shift
     for var in "$@"; do
         if [[ -z "${!var:-}" ]]; then
-            echo "Skipping $service: $var is not set"
+            log "Skipping $service: $var is not set"
             return 1
         fi
     done
@@ -95,21 +112,21 @@ run_service_tests() {
     local extra_flags="${3:-}"
     local tmpdir
 
-    echo ""
-    echo "=== $service ($label) ==="
+    log ""
+    log "${BOLD}=== $service ($label) ===${RESET}"
 
     # Test 1: Fresh clone
     tmpdir=$(mktemp -d)
     trap "rm -rf $tmpdir" RETURN
 
-    echo "  Running fresh clone..."
+    log "  Running fresh clone..."
     if run_gitbackup -service "$service" -backupdir "$tmpdir" $extra_flags; then
         all_found=true
         for repo_name in $EXPECTED_REPOS; do
             if check_repo_exists "$tmpdir" "$repo_name"; then
-                echo "    Found $repo_name"
+                log "    Found $repo_name"
             else
-                echo "    Missing $repo_name"
+                log "    Missing $repo_name"
                 all_found=false
             fi
         done
@@ -123,7 +140,7 @@ run_service_tests() {
     fi
 
     # Test 2: Update (run again into same directory)
-    echo "  Running update..."
+    log "  Running update..."
     if run_gitbackup -service "$service" -backupdir "$tmpdir" $extra_flags; then
         all_found=true
         for repo_name in $EXPECTED_REPOS; do
@@ -145,14 +162,14 @@ run_service_tests() {
     # Test 3: Bare clone
     tmpdir=$(mktemp -d)
 
-    echo "  Running bare clone..."
+    log "  Running bare clone..."
     if run_gitbackup -service "$service" -backupdir "$tmpdir" -bare $extra_flags; then
         all_found=true
         for repo_name in $EXPECTED_REPOS; do
             if check_bare_repo_exists "$tmpdir" "$repo_name"; then
-                echo "    Found ${repo_name}.git (bare)"
+                log "    Found ${repo_name}.git (bare)"
             else
-                echo "    Missing ${repo_name}.git (bare)"
+                log "    Missing ${repo_name}.git (bare)"
                 all_found=false
             fi
         done
@@ -170,22 +187,22 @@ run_service_tests() {
     # Test 4: Ignore private
     tmpdir=$(mktemp -d)
 
-    echo "  Running ignore-private clone..."
+    log "  Running ignore-private clone..."
     if run_gitbackup -service "$service" -backupdir "$tmpdir" -ignore-private $extra_flags; then
         if check_repo_exists "$tmpdir" "gitbackup-test-public"; then
-            echo "    Found gitbackup-test-public"
+            log "    Found gitbackup-test-public"
         else
-            echo "    Missing gitbackup-test-public"
+            log "    Missing gitbackup-test-public"
             fail "$service ($label): ignore-private — public repo not found"
             rm -rf "$tmpdir"
             trap - RETURN
             return
         fi
         if check_repo_exists "$tmpdir" "gitbackup-test-private"; then
-            echo "    Found gitbackup-test-private (unexpected)"
+            log "    Found gitbackup-test-private (unexpected)"
             fail "$service ($label): ignore-private — private repo should have been skipped"
         else
-            echo "    Correctly skipped gitbackup-test-private"
+            log "    Correctly skipped gitbackup-test-private"
             pass "$service ($label): ignore-private"
         fi
     else
@@ -197,13 +214,13 @@ run_service_tests() {
     # Test 5: Ignore fork
     tmpdir=$(mktemp -d)
 
-    echo "  Running clone without -ignore-fork (fork should be present)..."
+    log "  Running clone without -ignore-fork (fork should be present)..."
     if run_gitbackup -service "$service" -backupdir "$tmpdir" $extra_flags; then
         if check_repo_exists "$tmpdir" "gitbackup-test-ignore-fork"; then
-            echo "    Found gitbackup-test-ignore-fork (forked repo)"
+            log "    Found gitbackup-test-ignore-fork (forked repo)"
             pass "$service ($label): fork present without -ignore-fork"
         else
-            echo "    Missing gitbackup-test-ignore-fork (forked repo)"
+            log "    Missing gitbackup-test-ignore-fork (forked repo)"
             fail "$service ($label): fork present without -ignore-fork — gitbackup-test-ignore-fork not found"
         fi
     else
@@ -215,20 +232,20 @@ run_service_tests() {
     # Test 6: Ignore fork (with flag)
     tmpdir=$(mktemp -d)
 
-    echo "  Running clone with -ignore-fork..."
+    log "  Running clone with -ignore-fork..."
     if run_gitbackup -service "$service" -backupdir "$tmpdir" -ignore-fork $extra_flags; then
         if check_repo_exists "$tmpdir" "gitbackup-test-ignore-fork"; then
-            echo "    Found gitbackup-test-ignore-fork (unexpected — should be skipped)"
+            log "    Found gitbackup-test-ignore-fork (unexpected — should be skipped)"
             fail "$service ($label): ignore-fork — forked repo should have been skipped"
         else
-            echo "    Correctly skipped gitbackup-test-ignore-fork"
+            log "    Correctly skipped gitbackup-test-ignore-fork"
             # Verify non-fork repos are still present
             all_found=true
             for repo_name in $EXPECTED_REPOS; do
                 if check_repo_exists "$tmpdir" "$repo_name"; then
-                    echo "    Found $repo_name"
+                    log "    Found $repo_name"
                 else
-                    echo "    Missing $repo_name"
+                    log "    Missing $repo_name"
                     all_found=false
                 fi
             done
@@ -246,13 +263,51 @@ run_service_tests() {
     trap - RETURN
 }
 
+run_starred_tests() {
+    local service="$1"
+    local label="$2"
+    local extra_flags="$3"
+    local tmpdir
+
+    log ""
+    log "${BOLD}=== $service ($label) ===${RESET}"
+
+    tmpdir=$(mktemp -d)
+    trap "rm -rf $tmpdir" RETURN
+
+    log "  Running starred repos clone..."
+    if run_gitbackup -service "$service" -backupdir "$tmpdir" -use-https-clone $extra_flags; then
+        if check_repo_exists "$tmpdir" "gitbackup-test-public"; then
+            log "    Found gitbackup-test-public (starred)"
+        else
+            log "    Missing gitbackup-test-public (starred)"
+            fail "$service ($label): starred — gitbackup-test-public not found"
+            rm -rf "$tmpdir"
+            trap - RETURN
+            return
+        fi
+        if check_repo_exists "$tmpdir" "gitbackup-test-private"; then
+            log "    Found gitbackup-test-private (unexpected — not starred)"
+            fail "$service ($label): starred — gitbackup-test-private should not be present"
+        else
+            log "    Correctly excluded gitbackup-test-private (not starred)"
+            pass "$service ($label): starred"
+        fi
+    else
+        fail "$service ($label): starred — gitbackup exited with error"
+    fi
+
+    rm -rf "$tmpdir"
+    trap - RETURN
+}
+
 # --- Main ---
 
 PASSED=0
 FAILED=0
 RESULTS=()
 
-echo "Building gitbackup..."
+log "Building gitbackup..."
 (cd "$REPO_ROOT" && go build -o "$BINARY" .)
 
 for service in "${SERVICES[@]}"; do
@@ -261,11 +316,13 @@ for service in "${SERVICES[@]}"; do
             check_env github GITHUB_TOKEN || continue
             run_service_tests github "SSH"
             run_service_tests github "HTTPS" "-use-https-clone"
+            run_starred_tests github "starred" "-github.repoType starred"
             ;;
         gitlab)
             check_env gitlab GITLAB_TOKEN || continue
             run_service_tests gitlab "SSH" "-gitlab.projectVisibility all -gitlab.projectMembershipType owner"
             run_service_tests gitlab "HTTPS" "-gitlab.projectVisibility all -gitlab.projectMembershipType owner -use-https-clone"
+            run_starred_tests gitlab "starred" "-gitlab.projectVisibility all -gitlab.projectMembershipType starred"
             ;;
         bitbucket)
             check_env bitbucket BITBUCKET_USERNAME BITBUCKET_TOKEN || continue
@@ -276,6 +333,7 @@ for service in "${SERVICES[@]}"; do
             check_env forgejo FORGEJO_TOKEN || continue
             run_service_tests forgejo "SSH" "-githost.url https://codeberg.org"
             run_service_tests forgejo "HTTPS" "-githost.url https://codeberg.org -use-https-clone"
+            run_starred_tests forgejo "starred" "-githost.url https://codeberg.org -forgejo.repoType starred"
             ;;
     esac
 done
@@ -283,14 +341,15 @@ done
 # --- Summary (verbose only) ---
 
 if $VERBOSE; then
-    echo ""
-    echo "=============================="
-    echo "Results: $PASSED passed, $FAILED failed"
-    echo ""
+    log ""
+    log "${BOLD}==============================${RESET}"
+    log "Results: $PASSED passed, $FAILED failed"
+    log ""
     for r in "${RESULTS[@]}"; do
-        echo "  $r"
+        log "  $r"
     done
-    echo "=============================="
+    log "Elapsed: $((SECONDS - START_TIME))s"
+    log "${BOLD}==============================${RESET}"
 fi
 
 if [[ $FAILED -gt 0 ]]; then
