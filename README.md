@@ -23,6 +23,7 @@ Contact us for any custom on-prem or cloud deployment, new feature requests or e
       - [GitLab](#gitlab)
       - [Forgejo](#forgejo)
     - [Security and credentials](#security-and-credentials)
+    - [Configuration file](#configuration-file)
     - [Examples](#examples)
       - [Backing up your GitHub repositories](#backing-up-your-github-repositories)
       - [Backing up your GitLab repositories](#backing-up-your-gitlab-repositories)
@@ -122,6 +123,77 @@ and via the processes' environment for the lifetime of the process. By default, 
 is used to clone your repositories. If `use-https-clone` is specified, private repositories
 are cloned via `https` basic auth and the token provided will be stored  in the repositories' 
 `.git/config`.
+
+### Configuration file
+
+**Note:** Migration-related flags (``-github.createUserMigration``, ``-github.listUserMigrations``, etc.) are CLI-only and not supported in the config file.
+
+Instead of passing all options as CLI flags, you can use a ``gitbackup.yml`` configuration file.
+
+The config file is stored in the OS-specific configuration directory:
+
+- **Linux:** ``$XDG_CONFIG_HOME/gitbackup/gitbackup.yml`` or ``~/.config/gitbackup/gitbackup.yml``
+- **macOS:** ``~/Library/Application Support/gitbackup/gitbackup.yml``
+- **Windows:** ``%AppData%/gitbackup/gitbackup.yml``
+
+To create a default configuration file:
+
+```lang=bash
+$ gitbackup init
+```
+
+To create it at a custom location:
+
+```lang=bash
+$ gitbackup init --config /path/to/gitbackup.yml
+```
+
+This creates a ``gitbackup.yml`` with default values that you can edit:
+
+```yaml
+service: github
+githost_url: ""
+backup_dir: ""
+ignore_private: false
+ignore_fork: false
+use_https_clone: false
+bare: false
+github:
+    repo_type: all
+    namespace_whitelist: []
+gitlab:
+    project_visibility: internal
+    project_membership_type: all
+forgejo:
+    repo_type: user
+```
+
+To validate your configuration file (checks field values and required environment variables):
+
+```lang=bash
+$ gitbackup validate
+```
+
+To see available options for a subcommand:
+
+```lang=bash
+$ gitbackup init --help
+$ gitbackup validate --help
+```
+
+The config file is automatically loaded at runtime from the default location. CLI flags override config file values, so you can use the config file for your base settings and override individual options as needed:
+
+```lang=bash
+$ GITHUB_TOKEN=secret$token gitbackup -ignore-fork
+```
+
+To use a config file at a custom location:
+
+```lang=bash
+$ GITHUB_TOKEN=secret$token gitbackup -config /path/to/gitbackup.yml
+```
+
+Secrets (tokens, passwords) are not stored in the config file — they are always provided via environment variables.
 
 ### Examples
 
