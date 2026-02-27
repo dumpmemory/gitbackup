@@ -36,15 +36,15 @@ func resolveConfigPath(configPath string) (string, error) {
 // Migration-related flags are intentionally excluded as they
 // are one-off operations better suited to CLI flags.
 type fileConfig struct {
-	Service       string       `yaml:"service"`
-	GitHostURL    string       `yaml:"githost_url"`
-	BackupDir     string       `yaml:"backup_dir"`
-	IgnorePrivate bool         `yaml:"ignore_private"`
-	IgnoreFork    bool         `yaml:"ignore_fork"`
-	UseHTTPSClone bool         `yaml:"use_https_clone"`
-	Bare          bool         `yaml:"bare"`
-	GitHub        githubConfig `yaml:"github"`
-	GitLab        gitlabConfig `yaml:"gitlab"`
+	Service       string        `yaml:"service"`
+	GitHostURL    string        `yaml:"githost_url"`
+	BackupDir     string        `yaml:"backup_dir"`
+	IgnorePrivate bool          `yaml:"ignore_private"`
+	IgnoreFork    bool          `yaml:"ignore_fork"`
+	UseHTTPSClone bool          `yaml:"use_https_clone"`
+	Bare          bool          `yaml:"bare"`
+	GitHub        githubConfig  `yaml:"github"`
+	GitLab        gitlabConfig  `yaml:"gitlab"`
 	Forgejo       forgejoConfig `yaml:"forgejo"`
 }
 
@@ -103,6 +103,8 @@ func handleInitConfig(configPath string) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("error creating directory %s: %v", dir, err)
 	}
+
+	fmt.Println("Creating a default config with service: github")
 
 	cfg := defaultFileConfig()
 	data, err := yaml.Marshal(&cfg)
