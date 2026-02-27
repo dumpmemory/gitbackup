@@ -126,6 +126,8 @@ are cloned via `https` basic auth and the token provided will be stored  in the 
 
 ### Configuration file
 
+**Note:** Migration-related flags (``-github.createUserMigration``, ``-github.listUserMigrations``, etc.) are CLI-only and not supported in the config file.
+
 Instead of passing all options as CLI flags, you can use a ``gitbackup.yml`` configuration file.
 
 The config file is stored in the OS-specific configuration directory:
@@ -192,8 +194,6 @@ $ GITHUB_TOKEN=secret$token gitbackup -config /path/to/gitbackup.yml
 ```
 
 Secrets (tokens, passwords) are not stored in the config file — they are always provided via environment variables.
-
-**Note:** Migration-related flags (``-github.createUserMigration``, ``-github.listUserMigrations``, etc.) are CLI-only and not supported in the config file.
 
 ### Examples
 
